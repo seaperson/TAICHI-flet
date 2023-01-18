@@ -24,7 +24,9 @@ from flet import (
 
 from methods.getmusics import DataSong
 from methods.getmusics import HIFINI
+from methods.getmusics import MiGu
 from utils import snack_bar, ms_to_time, handle_redirect, download_url_content, DESKTOP
+import requests
 
 
 class Song(Row):
@@ -117,7 +119,8 @@ class SearchCompoment(Row):
     """
 
     def __init__(self, search_callback):
-        self.music_api = HIFINI
+        # self.music_api = HIFINI
+        self.music_api = MiGu
         self.search_callback = search_callback
         self.search_input = TextField(
             label="请输入歌曲名称或歌手名称",
@@ -225,7 +228,8 @@ class AudioBar(Row):
         )
         self.total_time = Text("00:00")
         self.popup_menu = PopupMenuButton(
-            items=[PopupMenuItem(text="下载歌曲", on_click=self.download_music)]
+            items=[PopupMenuItem(text="下载歌曲", on_click=self.download_music),
+                   PopupMenuItem(text="下载歌曲(带歌词)", on_click=self.download_music_with_lyrics)]
         )
         self.play_btn = IconButton(
             icon=icons.PLAY_CIRCLE,
@@ -387,6 +391,48 @@ class AudioBar(Row):
             f.write(resp.content)
         snack_bar(self.page, f"{name} 已保存至桌面")
 
+    def download_music_with_lyrics(self, e):
+        print(self.song)
+        if self.song is None:
+            return
+        if self.song.source == "migu":
+            headers = {
+                "Accept": "*/*",
+                "Accept-Encoding": "identity",
+                "User-Agent": "Wget/1.19.5 (darwin17.5.0)",
+            }
+            r = requests.get(
+                self.song.music_url,
+                stream=False,
+                headers=headers,
+            )
+            music_name = self.song.music_name
+            music_singer = self.song.singer_name
+            name = music_name + "_" + music_singer + ".flac"
+            filepath = "/Users/maixb/Downloads/"
+            with open(filepath + name, "wb") as f:
+                f.write(r.content)
+            if len(self.song.lyrics_url) > 0:
+                lyrics_name = music_name + "_" + music_singer + ".lrc"
+                resp = requests.get(
+                    self.song.lyrics_url,
+                    stream=False,
+                    headers=headers,
+                )
+                with open(filepath + lyrics_name, "wb") as f:
+                    f.write(resp.content)
+            snack_bar(self.page, f"{self.song.music_name} 已下载")
+            return
+        else:
+            music_name = self.song.music_name
+            music_singer = self.song.singer_name
+            name = music_name + "_" + music_singer + ".mp3"
+            url = self.song.music_url
+            resp = download_url_content(url)
+            with open(DESKTOP + "/" + name, "wb") as f:
+                f.write(resp.content)
+            snack_bar(self.page, f"{name} 已保存至桌面")
+
 
 class RightSearchSection(Column):
     """右侧区域"""
@@ -425,7 +471,8 @@ class LeftPlaySection(Column):
 
 class ViewPage(Stack):
     def __init__(self, page):
-        self.music_api = HIFINI
+        # self.music_api = HIFINI
+        self.music_api = MiGu
         self.left_widget = LeftPlaySection(self)
         self.right_widget = RightSearchSection(self)
         self.row = Row(
